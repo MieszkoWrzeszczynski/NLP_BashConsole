@@ -2,8 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-parsetab.py
-parser.out
 
 # C extensions
 *.so
@@ -89,3 +87,5 @@ ENV/
 
 # Rope project settings
 .ropeproject
+parsetab.py
+parser.out
