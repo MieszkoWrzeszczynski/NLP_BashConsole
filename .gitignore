@@ -89,3 +89,4 @@ ENV/
 .ropeproject
 parsetab.py
 parser.out
+test/
