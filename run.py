@@ -28,19 +28,21 @@ tokens = (
     'PROGRAMS',
     'CLOSE',
     'CONCAT',
-    'ALL_CLOSE'
+    'ALL_CLOSE',
+    'WORD'
 )
 
 t_RUN =r'\b'  +resources[0]  + '\b'
 t_CLOSE = r'\b' + resources[1] + '\b'
 t_WEB = r'(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})|(\.?\w+\.(pl|com|de|en|org))'
-t_SEARCH = resources[2] 
+t_SEARCH = resources[2]
 t_MEDIAFILE = "[/\w/]+\.(" + resources[3] + ")"
 t_TEXTFILE  = "[/\w]+\.(" + resources[4] + ")"
 t_IMAGEFILE  = "[/\w]+\.(" + resources[5] + ")"
 t_CONCAT = r'\b(następnie|kolejno|dalej|i)\b'
 t_ignore = " \t"
-t_PROGRAMS = resources[6] 
+t_WORD = r'\w+'
+t_PROGRAMS = resources[6] + "\w+"
 t_ALL_CLOSE = r'wszystkie|wszystko'
 
 def t_error(t):
@@ -49,7 +51,7 @@ def t_error(t):
 lexer = lex.lex()
 
 def p_expression(p):
-    '''expression : openprogram 
+    '''expression : openprogram
                   | search
                   | openbrowser
                   | closeprogram
@@ -63,22 +65,36 @@ def p_expression(p):
 
 def p_search(p):
     ''' search : SEARCH '''
-
     query = ' '.join(natural_input.split(p[1]))
-    proces = Popen("firefox -search " + r'''"''' +  query  +'''"''', shell=True, stdin=PIPE, stdout=DEVNULL, stderr=STDOUT) 
+    search_dict = resources[2].split('|')
+
+    for word in search_dict:
+        if( word in natural_input ):
+            query = ' '.join(natural_input.split(word)[1:])
+
+    genitive = query.split(' ')[1]
+
+    p = Popen(['./lema.sh', genitive], stdout=PIPE,stderr=PIPE)
+    out, err = p.communicate()
+    out = out.decode('UTF-8')
+    query = out + " " + ' '.join(query.split(' ')[2:])
+
+    proces = Popen("firefox -search " + r'''"''' +  query  +'''"''', shell=True, stdin=PIPE, stdout=DEVNULL, stderr=STDOUT)
     programs_PID.append({'name' : 'firefox', 'pid' : proces})
 
 
 def p_openprogram(p):
-    ''' openprogram : RUN PROGRAMS 
-                    | RUN PROGRAMS PROGRAMS'''
+    ''' openprogram : RUN PROGRAMS
+                    | RUN PROGRAMS PROGRAMS
+                    | RUN WORD'''
 
     program_name = p[2]
+    program = p[2]
 
     if program_name in programsDict:
         program = programsDict[program_name]
 
-    proces = Popen(program, shell=False,  stdout=DEVNULL,stderr=STDOUT) 
+    proces = Popen(program, shell=False,  stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : program_name, 'process' : proces})
 
 def p_openmultiple(p):
@@ -93,26 +109,27 @@ def p_openmultiple(p):
     if program_name_second in programsDict:
         program_second = programsDict[program_name_second]
 
-    proces_first = Popen(program_first, shell=False,  stdout=DEVNULL,stderr=STDOUT) 
+    proces_first = Popen(program_first, shell=False,  stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : program_name_first, 'process' : proces_first})
 
-    proces_second = Popen(program_second, shell=False,  stdout=DEVNULL,stderr=STDOUT) 
+    proces_second = Popen(program_second, shell=False,  stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : program_name_second, 'process' : proces_second})
 
 
-def p_closeprogram(p):
-    ''' closeprogram : CLOSE ALL_CLOSE '''
+def p_closeall(p):
+    ''' closeall : CLOSE ALL_CLOSE '''
 
     for proces in programs_PID:
         proces['process'].kill()
         programs_PID.remove(proces)
 
 
-def p_closeall(p):
-    ''' closeall : CLOSE PROGRAMS
+def p_closeprogram(p):
+    ''' closeprogram : CLOSE PROGRAMS
                      | CLOSE TEXTFILE
                      | CLOSE MEDIAFILE
                      | CLOSE IMAGEFILE
+                     | CLOSE WORD
                      '''
 
     for proces in programs_PID:
@@ -123,25 +140,25 @@ def p_closeall(p):
 def p_openbrowser(p):
     ''' openbrowser : RUN WEB '''
 
-    proces = Popen("firefox " + p[2], shell=True, stdout=DEVNULL,sterr=DEVNULL) 
+    proces = Popen("firefox " + p[2], shell=True, stdout=DEVNULL,sterr=DEVNULL)
     programs_PID.append({'name' : 'firefox', 'process' : proces})
 
 def p_opentextfile(p):
     ''' opentextfile : RUN TEXTFILE'''
 
-    proces = Popen(['gedit', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT) 
+    proces = Popen(['gedit', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : p[2], 'process' : proces})
 
 def p_openmusicfile(p):
     ''' openmusicfile : RUN MEDIAFILE'''
 
-    proces = Popen(['vlc', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT) 
+    proces = Popen(['vlc', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : p[2], 'process' : proces})
 
 def p_openimagefile(p):
     ''' openimagefile : RUN IMAGEFILE'''
 
-    proces = Popen(['display', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT) 
+    proces = Popen(['display', p[2]], shell=False, stdout=DEVNULL,stderr=STDOUT)
     programs_PID.append({'name' : p[2], 'process' : proces})
 
 def p_error(p):
@@ -152,6 +169,7 @@ yacc.yacc()
 
 natural_input = ""
 
-while True: 
+
+while True:
     natural_input  = input().lower()
     yacc.parse(natural_input)
