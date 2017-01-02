@@ -28,21 +28,19 @@ tokens = (
     'PROGRAMS',
     'CLOSE',
     'CONCAT',
-    'ALL_CLOSE',
-    'WORD'
+    'ALL_CLOSE'
 )
 
-t_RUN =r'\b'  +resources[0]  + '\b'
+t_RUN = r'\b' + resources[0]  + '\b'
 t_CLOSE = r'\b' + resources[1] + '\b'
 t_WEB = r'(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})|(\.?\w+\.(pl|com|de|en|org))'
-t_SEARCH = resources[2]
+t_SEARCH = r'\b' + resources[2] + '\b'
 t_MEDIAFILE = "[/\w/]+\.(" + resources[3] + ")"
 t_TEXTFILE  = "[/\w]+\.(" + resources[4] + ")"
 t_IMAGEFILE  = "[/\w]+\.(" + resources[5] + ")"
 t_CONCAT = r'\b(następnie|kolejno|dalej|i)\b'
 t_ignore = " \t"
-t_WORD = r'\w+'
-t_PROGRAMS = resources[6] + "\w+"
+t_PROGRAMS =  resources[6]
 t_ALL_CLOSE = r'wszystkie|wszystko'
 
 def t_error(t):
@@ -85,8 +83,7 @@ def p_search(p):
 
 def p_openprogram(p):
     ''' openprogram : RUN PROGRAMS
-                    | RUN PROGRAMS PROGRAMS
-                    | RUN WORD'''
+                    | RUN PROGRAMS PROGRAMS'''
 
     program_name = p[2]
     program = p[2]
@@ -94,27 +91,23 @@ def p_openprogram(p):
     if program_name in programsDict:
         program = programsDict[program_name]
 
-    proces = Popen(program, shell=False,  stdout=DEVNULL,stderr=STDOUT)
+    proces = Popen(program, stderr=STDOUT, stdout=PIPE)
     programs_PID.append({'name' : program_name, 'process' : proces})
 
 def p_openmultiple(p):
     ''' openmultiple : RUN PROGRAMS CONCAT PROGRAMS'''
 
-    program_name_first = p[2]
-    program_name_second = p[4]
+    programs = []
 
-    if program_name_first in programsDict:
-        program_first = programsDict[program_name_first]
+    programs.append(p[2])
+    programs.append(p[4])
 
-    if program_name_second in programsDict:
-        program_second = programsDict[program_name_second]
+    for program in programs:
+        if program in programsDict:
+            program_first = programsDict[program]
 
-    proces_first = Popen(program_first, shell=False,  stdout=DEVNULL,stderr=STDOUT)
-    programs_PID.append({'name' : program_name_first, 'process' : proces_first})
-
-    proces_second = Popen(program_second, shell=False,  stdout=DEVNULL,stderr=STDOUT)
-    programs_PID.append({'name' : program_name_second, 'process' : proces_second})
-
+        proces_first = Popen(program_first, shell=False,  stdout=DEVNULL,stderr=STDOUT)
+        programs_PID.append({'name' : program, 'process' : proces_first})
 
 def p_closeall(p):
     ''' closeall : CLOSE ALL_CLOSE '''
@@ -123,13 +116,11 @@ def p_closeall(p):
         proces['process'].kill()
         programs_PID.remove(proces)
 
-
 def p_closeprogram(p):
     ''' closeprogram : CLOSE PROGRAMS
                      | CLOSE TEXTFILE
                      | CLOSE MEDIAFILE
                      | CLOSE IMAGEFILE
-                     | CLOSE WORD
                      '''
 
     for proces in programs_PID:
@@ -168,7 +159,6 @@ def p_error(p):
 yacc.yacc()
 
 natural_input = ""
-
 
 while True:
     natural_input  = input().lower()
